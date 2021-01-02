@@ -42,24 +42,24 @@ proc process_var {contents} {
 
     array set variables {}
 
-    foreach {dummy name value} [regexp -all -inline -- {<!--#set:([^=]+?)=([^#]*?)#-->} $contents] {
-        set variables($name) $value
-    }
-    foreach {dummy name value} [regexp -all -inline -- {<!--#append:([^=]+?)=([^#]*?)#-->} $contents] {
-        append variables($name) $value
-    }
-    foreach {dummy name value} [regexp -all -inline -- {<!--#prepend:([^=]+?)=([^#]*?)#-->} $contents] {
-        if {[catch {set orig_value $variables($name)}]} {
-            set orig_value ""
+    set pattern {<!--#((?:set)|(?:append)|(?:prepend)){1,1}?:([^=]+?)=(.*?)#-->}
+
+    foreach {dummy directive name value} [regexp -all -inline -- $pattern $contents] {
+        if {[string equal $directive "set"]} {
+            set variables($name) $value
+        } elseif {[string equal $directive "append"]} {
+            append variables($name) $value
+        } elseif {[string equal $directive "prepend"]} {
+            if {[catch {set orig_value $variables($name)}]} {
+                set orig_value ""
+            }
+
+            set    variables($name) $value
+            append variables($name) $orig_value
         }
-
-        set    variables($name) $value
-        append variables($name) $orig_value
     }
 
-    set contents [regsub -all -- {<!--#set:[^=]+?=[^#]*?#-->}     $contents ""]
-    set contents [regsub -all -- {<!--#append:[^=]+?=[^#]*?#-->}  $contents ""]
-    set contents [regsub -all -- {<!--#prepend:[^=]+?=[^#]*?#-->} $contents ""]
+    set contents [regsub -all -- $pattern $contents ""]
 
     return [subst -nobackslashes -novariables [regsub -all -- {<!--@([^@]+?)@-->} $contents {[subst_var {\1}]}]]
 }
