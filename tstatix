@@ -42,7 +42,7 @@ proc process_var {contents} {
 
     array set variables {}
 
-    set pattern {<!--#((?:set)|(?:append)|(?:prepend)){1,1}?:([^=]+?)=(.*?)#-->}
+    set pattern {<!--#((?:set)|(?:append)|(?:prepend)){1,1}?:(.+?)=(.*?)#-->}
 
     foreach {dummy directive name value} [regexp -all -inline -- $pattern $contents] {
         if {[string equal $directive "set"]} {
@@ -61,7 +61,7 @@ proc process_var {contents} {
 
     set contents [regsub -all -- $pattern $contents ""]
 
-    return [subst -nobackslashes -novariables [regsub -all -- {<!--@([^@]+?)@-->} $contents {[subst_var {\1}]}]]
+    return [subst -nobackslashes -novariables [regsub -all -- {<!--@(.+?)@-->} $contents {[subst_var {\1}]}]]
 }
 
 set encoding "utf-8"
