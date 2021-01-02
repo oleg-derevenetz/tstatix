@@ -108,7 +108,7 @@ if {$argc > [expr $arg_idx + 1]} {
         close $fd
     }
 } else {
-    puts "Usage: [file tail $argv0] ?-encoding encoding? ?-set variable=value ...? ?--? src_dir dst_dir ?pattern ...?"
+    puts stderr "Usage: [file tail $argv0] ?-encoding encoding? ?-set variable=value ...? ?--? src_dir dst_dir ?pattern ...?"
 
     # EX_USAGE
     exit 64
