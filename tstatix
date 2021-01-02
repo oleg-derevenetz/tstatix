@@ -1,0 +1,107 @@
+#!/usr/bin/env tclsh
+
+proc scan_files {dir patterns} {
+    set result {}
+
+    foreach subdir [glob -types d -nocomplain -join -- $dir *] {
+        set subfiles [scan_files $subdir $patterns]
+
+        if {[llength $subfiles] > 0} {
+            lappend result $subfiles
+        }
+    }
+
+    foreach pattern $patterns {
+        set files [glob -types f -nocomplain -join -- $dir $pattern]
+
+        if {[llength $files] > 0} {
+            lappend result $files
+        }
+    }
+
+    return [join $result]
+}
+
+proc process_include {file encoding} {
+    set         fd [open $file "r"]
+    fconfigure $fd -encoding $encoding
+
+    set contents [read $fd]
+
+    close $fd
+
+    return [subst -nobackslashes -novariables [regsub -all -- {<!--#include:(.*?)#-->} $contents {[process_include [file join [file dirname $file] {\1}] $encoding]}]]
+}
+
+proc process_var {contents} {
+    proc subst_var {name} {
+        upvar variables variables
+
+        return $variables($name)
+    }
+
+    array set variables {}
+
+    foreach {dummy name value} [regexp -all -inline -- {<!--#set:([^=]+?)=([^#]*?)#-->} $contents] {
+        set variables($name) $value
+    }
+    foreach {dummy name value} [regexp -all -inline -- {<!--#append:([^=]+?)=([^#]*?)#-->} $contents] {
+        append variables($name) $value
+    }
+    foreach {dummy name value} [regexp -all -inline -- {<!--#prepend:([^=]+?)=([^#]*?)#-->} $contents] {
+        if {[catch {set orig_value $variables($name)}]} {
+            set orig_value ""
+        }
+
+        set    variables($name) $value
+        append variables($name) $orig_value
+    }
+
+    set contents [regsub -all -- {<!--#set:[^=]+?=[^#]*?#-->}     $contents ""]
+    set contents [regsub -all -- {<!--#append:[^=]+?=[^#]*?#-->}  $contents ""]
+    set contents [regsub -all -- {<!--#prepend:[^=]+?=[^#]*?#-->} $contents ""]
+
+    return [subst -nobackslashes -novariables [regsub -all -- {<!--@([^@]+?)@-->} $contents {[subst_var {\1}]}]]
+}
+
+set encoding "utf-8"
+
+for {set arg_idx 0} {$arg_idx < [llength $argv]} {incr arg_idx} {
+    if {[string equal [lindex $argv $arg_idx] "-encoding"]} {
+        set encoding [lindex $argv [incr arg_idx]]
+    } elseif {[string equal [lindex $argv $arg_idx] "--"]} {
+        incr arg_idx
+
+        break
+    } else {
+        break
+    }
+}
+
+if {$argc > [expr $arg_idx + 1]} {
+    set src_dir  [lindex $argv [expr $arg_idx + 0]]
+    set dst_dir  [lindex $argv [expr $arg_idx + 1]]
+    set patterns [lrange $argv [expr $arg_idx + 2] end]
+
+    if {[llength $patterns] == 0} {
+        set patterns [list "*.html"]
+    }
+
+    foreach src_file [scan_files $src_dir $patterns] {
+        set dst_file [eval [join [list file join $dst_dir [lrange [file split $src_file] [llength [file split $src_dir]] end]]]]
+
+        file mkdir [file dirname $dst_file]
+
+        set         fd [open $dst_file "w"]
+        fconfigure $fd -encoding $encoding
+
+        puts -nonewline $fd [process_var [process_include $src_file $encoding]]
+
+        close $fd
+    }
+} else {
+    puts "Usage: [file tail $argv0] ?-encoding encoding? ?--? src_dir dst_dir ?pattern ...?"
+
+    # EX_USAGE
+    exit 64
+}
