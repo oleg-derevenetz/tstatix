@@ -19,4 +19,5 @@ a block from the specified file to reuse existing HTML code;
 	-  `<!--@variable@-->`  inserts  the  value of a previously defined
 	variable.
 
-Check out the examples directory for more info.
+Run  the  `./tstatix` command and check out the examples directory for more
+info.
