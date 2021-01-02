@@ -33,14 +33,16 @@ proc process_include {file encoding} {
     return [subst -nobackslashes -novariables [regsub -all -- {<!--#include:(.*?)#-->} $contents {[process_include [file join [file dirname $file] {\1}] $encoding]}]]
 }
 
-proc process_var {contents} {
+proc process_var {contents cmd_variables_arg} {
     proc subst_var {name} {
         upvar variables variables
 
         return $variables($name)
     }
 
-    array set variables {}
+    upvar $cmd_variables_arg cmd_variables
+
+    array set variables [array get cmd_variables]
 
     set pattern {<!--#((?:set)|(?:append)|(?:prepend)){1,1}?:(.+?)=(.*?)#-->}
 
@@ -66,9 +68,15 @@ proc process_var {contents} {
 
 set encoding "utf-8"
 
+array set cmd_variables {}
+
 for {set arg_idx 0} {$arg_idx < [llength $argv]} {incr arg_idx} {
     if {[string equal [lindex $argv $arg_idx] "-encoding"]} {
         set encoding [lindex $argv [incr arg_idx]]
+    } elseif {[string equal [lindex $argv $arg_idx] "-set"]} {
+        if {[regexp {^(.+?)=(.*?)$} [lindex $argv [incr arg_idx]] dummy name value]} {
+            set cmd_variables($name) $value
+        }
     } elseif {[string equal [lindex $argv $arg_idx] "--"]} {
         incr arg_idx
 
@@ -95,12 +103,12 @@ if {$argc > [expr $arg_idx + 1]} {
         set         fd [open $dst_file "w"]
         fconfigure $fd -encoding $encoding
 
-        puts -nonewline $fd [process_var [process_include $src_file $encoding]]
+        puts -nonewline $fd [process_var [process_include $src_file $encoding] cmd_variables]
 
         close $fd
     }
 } else {
-    puts "Usage: [file tail $argv0] ?-encoding encoding? ?--? src_dir dst_dir ?pattern ...?"
+    puts "Usage: [file tail $argv0] ?-encoding encoding? ?-set variable=value ...? ?--? src_dir dst_dir ?pattern ...?"
 
     # EX_USAGE
     exit 64
